@@ -1,0 +1,41 @@
+# Connect this file to a GitHub push trigger with branch regex ^main$.
+# For a manual smoke deployment, use the command in README.md.
+steps:
+  - id: test-and-package
+    name: maven:3.9.11-eclipse-temurin-21
+    entrypoint: mvn
+    args: ['-B', 'clean', 'verify']
+  - id: build-image
+    name: gcr.io/cloud-builders/docker
+    args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$BUILD_ID', '.']
+  - id: push-image
+    name: gcr.io/cloud-builders/docker
+    args: ['push', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$BUILD_ID']
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - '${_SERVICE}'
+      - '--image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$BUILD_ID'
+      - '--region=${_REGION}'
+      - '--service-account=${_RUNTIME_SERVICE_ACCOUNT}'
+      - '--port=8080'
+      - '--memory=512Mi'
+      - '--cpu=1'
+      - '--min-instances=0'
+      - '--max-instances=2'
+      - '--concurrency=40'
+      - '--quiet'
+images:
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$BUILD_ID'
+substitutions:
+  _REGION: us-central1
+  _REPOSITORY: java-apps
+  _SERVICE: hello-world
+  _RUNTIME_SERVICE_ACCOUNT: 'hello-runtime@$PROJECT_ID.iam.gserviceaccount.com'
+options:
+  logging: CLOUD_LOGGING_ONLY
+  dynamicSubstitutions: true
+timeout: 1200s

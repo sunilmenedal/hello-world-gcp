@@ -1,0 +1,4 @@
+**
+!target/
+!target/hello-world.jar
+!Dockerfile
